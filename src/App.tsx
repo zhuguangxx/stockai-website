@@ -7,6 +7,7 @@ import FAQ from './sections/FAQ';
 import Footer from './sections/Footer';
 import Login from './admin/Login';
 import AdminPanel from './admin/AdminPanel';
+import SetupAdmin from './admin/SetupAdmin';
 
 // 首页组件
 function HomePage() {
@@ -28,6 +29,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/admin/setup" element={<SetupAdmin />} />
         <Route path="/admin/login" element={<Login />} />
         <Route path="/admin" element={<AdminPanel />} />
       </Routes>
