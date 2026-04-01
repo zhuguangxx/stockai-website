@@ -2,13 +2,19 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  FileText, 
   Settings, 
   LogOut, 
   Save,
   RefreshCw,
   Check,
-  Globe
+  Globe,
+  Phone,
+  Plus,
+  Pencil,
+  Trash2,
+  GripVertical,
+  HelpCircle,
+  Cpu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +22,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { authApi, siteContentApi, featuresApi, hardwareApi, faqApi } from '@/supabase/client';
 import type { Feature, HardwareSpec, FAQItem } from '@/types';
 
@@ -25,6 +33,13 @@ interface HeroFormData {
   ctaPrimary: string;
   ctaSecondary: string;
   price: string;
+}
+
+interface ContactFormData {
+  phone: string;
+  email: string;
+  address: string;
+  wechat: string;
 }
 
 export default function AdminPanel() {
@@ -42,10 +57,29 @@ export default function AdminPanel() {
     price: '¥1,299',
   });
 
+  // Contact content
+  const [contactData, setContactData] = useState<ContactFormData>({
+    phone: '',
+    email: '',
+    address: '',
+    wechat: '',
+  });
+
   // Features, Hardware, FAQ data
   const [features, setFeatures] = useState<Feature[]>([]);
   const [hardwareSpecs, setHardwareSpecs] = useState<HardwareSpec[]>([]);
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
+
+  // Dialog states
+  const [featureDialog, setFeatureDialog] = useState<{ open: boolean; editing?: Feature | null }>({ open: false });
+  const [hardwareDialog, setHardwareDialog] = useState<{ open: boolean; editing?: HardwareSpec | null }>({ open: false });
+  const [faqDialog, setFaqDialog] = useState<{ open: boolean; editing?: FAQItem | null }>({ open: false });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; type: 'feature' | 'hardware' | 'faq'; id: string } | null>(null);
+
+  // Form states
+  const [featureForm, setFeatureForm] = useState({ title: '', description: '', icon: '', order: 0 });
+  const [hardwareForm, setHardwareForm] = useState({ name: '', value: '', unit: '', order: 0 });
+  const [faqForm, setFaqForm] = useState({ question: '', answer: '', order: 0 });
 
   useEffect(() => {
     checkAuth();
@@ -76,17 +110,30 @@ export default function AdminPanel() {
         price: heroMap.price || prev.price,
       }));
 
+      // Load contact content
+      const contactContents = await siteContentApi.getContentBySection('contact');
+      const contactMap: Record<string, string> = {};
+      contactContents.forEach(item => {
+        contactMap[item.key] = item.value;
+      });
+      setContactData({
+        phone: contactMap.phone || '',
+        email: contactMap.email || '',
+        address: contactMap.address || '',
+        wechat: contactMap.wechat || '',
+      });
+
       // Load features
       const featuresData = await featuresApi.getAll();
-      if (featuresData.length > 0) setFeatures(featuresData);
+      setFeatures(featuresData);
 
       // Load hardware specs
       const hardwareData = await hardwareApi.getAll();
-      if (hardwareData.length > 0) setHardwareSpecs(hardwareData);
+      setHardwareSpecs(hardwareData);
 
       // Load FAQs
       const faqData = await faqApi.getAll();
-      if (faqData.length > 0) setFaqs(faqData);
+      setFaqs(faqData);
     } catch (error) {
       console.error('Failed to load data:', error);
       showMessage('error', '加载数据失败');
@@ -113,6 +160,187 @@ export default function AdminPanel() {
       showMessage('success', '首页内容已保存');
     } catch (error) {
       showMessage('error', '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    setSaving(true);
+    try {
+      await siteContentApi.batchUpdateContent([
+        { section: 'contact', key: 'phone', value: contactData.phone },
+        { section: 'contact', key: 'email', value: contactData.email },
+        { section: 'contact', key: 'address', value: contactData.address },
+        { section: 'contact', key: 'wechat', value: contactData.wechat },
+      ]);
+      showMessage('success', '联系方式已保存');
+    } catch (error) {
+      showMessage('error', '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Feature handlers
+  const openFeatureDialog = (feature?: Feature) => {
+    if (feature) {
+      setFeatureForm({
+        title: feature.title,
+        description: feature.description,
+        icon: feature.icon,
+        order: feature.order,
+      });
+      setFeatureDialog({ open: true, editing: feature });
+    } else {
+      setFeatureForm({ title: '', description: '', icon: '', order: features.length });
+      setFeatureDialog({ open: true, editing: null });
+    }
+  };
+
+  const handleSaveFeature = async () => {
+    if (!featureForm.title || !featureForm.description) {
+      showMessage('error', '请填写完整信息');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      if (featureDialog.editing) {
+        await featuresApi.update(featureDialog.editing.id, featureForm);
+        showMessage('success', '功能已更新');
+      } else {
+        await featuresApi.create({ ...featureForm, name: featureForm.title });
+        showMessage('success', '功能已添加');
+      }
+      setFeatureDialog({ open: false });
+      await loadAllData();
+    } catch (error) {
+      showMessage('error', '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteFeature = async () => {
+    if (!deleteDialog) return;
+    setSaving(true);
+    try {
+      await featuresApi.delete(deleteDialog.id);
+      showMessage('success', '功能已删除');
+      setDeleteDialog(null);
+      await loadAllData();
+    } catch (error) {
+      showMessage('error', '删除失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Hardware handlers
+  const openHardwareDialog = (spec?: HardwareSpec) => {
+    if (spec) {
+      setHardwareForm({
+        name: spec.name,
+        value: spec.value,
+        unit: (spec as any).unit || '',
+        order: spec.order,
+      });
+      setHardwareDialog({ open: true, editing: spec });
+    } else {
+      setHardwareForm({ name: '', value: '', unit: '', order: hardwareSpecs.length });
+      setHardwareDialog({ open: true, editing: null });
+    }
+  };
+
+  const handleSaveHardware = async () => {
+    if (!hardwareForm.name || !hardwareForm.value) {
+      showMessage('error', '请填写完整信息');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      if (hardwareDialog.editing) {
+        await hardwareApi.update(hardwareDialog.editing.id, hardwareForm);
+        showMessage('success', '硬件规格已更新');
+      } else {
+        await hardwareApi.create(hardwareForm);
+        showMessage('success', '硬件规格已添加');
+      }
+      setHardwareDialog({ open: false });
+      await loadAllData();
+    } catch (error) {
+      showMessage('error', '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteHardware = async () => {
+    if (!deleteDialog) return;
+    setSaving(true);
+    try {
+      await hardwareApi.delete(deleteDialog.id);
+      showMessage('success', '硬件规格已删除');
+      setDeleteDialog(null);
+      await loadAllData();
+    } catch (error) {
+      showMessage('error', '删除失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // FAQ handlers
+  const openFaqDialog = (faq?: FAQItem) => {
+    if (faq) {
+      setFaqForm({
+        question: faq.question,
+        answer: faq.answer,
+        order: faq.order,
+      });
+      setFaqDialog({ open: true, editing: faq });
+    } else {
+      setFaqForm({ question: '', answer: '', order: faqs.length });
+      setFaqDialog({ open: true, editing: null });
+    }
+  };
+
+  const handleSaveFaq = async () => {
+    if (!faqForm.question || !faqForm.answer) {
+      showMessage('error', '请填写完整信息');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      if (faqDialog.editing) {
+        await faqApi.update(faqDialog.editing.id, faqForm);
+        showMessage('success', 'FAQ已更新');
+      } else {
+        await faqApi.create(faqForm);
+        showMessage('success', 'FAQ已添加');
+      }
+      setFaqDialog({ open: false });
+      await loadAllData();
+    } catch (error) {
+      showMessage('error', '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteFaq = async () => {
+    if (!deleteDialog) return;
+    setSaving(true);
+    try {
+      await faqApi.delete(deleteDialog.id);
+      showMessage('success', 'FAQ已删除');
+      setDeleteDialog(null);
+      await loadAllData();
+    } catch (error) {
+      showMessage('error', '删除失败');
     } finally {
       setSaving(false);
     }
@@ -173,40 +401,45 @@ export default function AdminPanel() {
         )}
 
         <Tabs defaultValue="hero" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto">
             <TabsTrigger value="hero" className="flex items-center gap-2">
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">首页设置</span>
+            </TabsTrigger>
+            <TabsTrigger value="contact" className="flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              <span className="hidden sm:inline">联系方式</span>
             </TabsTrigger>
             <TabsTrigger value="features" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
               <span className="hidden sm:inline">功能管理</span>
             </TabsTrigger>
             <TabsTrigger value="hardware" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
+              <Cpu className="w-4 h-4" />
               <span className="hidden sm:inline">硬件规格</span>
             </TabsTrigger>
             <TabsTrigger value="faq" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
+              <HelpCircle className="w-4 h-4" />
               <span className="hidden sm:inline">FAQ管理</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Hero Tab */}
           <TabsContent value="hero" className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-lg font-semibold">首页内容设置</h2>
-                  <p className="text-sm text-gray-500">修改首页Hero区域展示的内容</p>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>首页内容设置</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">修改首页Hero区域展示的内容</p>
+                  </div>
+                  <Button onClick={handleSaveHero} disabled={saving}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {saving ? '保存中...' : '保存更改'}
+                  </Button>
                 </div>
-                <Button onClick={handleSaveHero} disabled={saving}>
-                  <Save className="w-4 h-4 mr-2" />
-                  {saving ? '保存中...' : '保存更改'}
-                </Button>
-              </div>
-
-              <div className="grid gap-6">
+              </CardHeader>
+              <CardContent className="space-y-6">
                 <div className="grid gap-2">
                   <Label htmlFor="mainTitle">主标题</Label>
                   <Input
@@ -258,95 +491,430 @@ export default function AdminPanel() {
                     placeholder="¥1,299"
                   />
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Contact Tab */}
+          <TabsContent value="contact" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>联系方式设置</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">管理公司联系信息，将显示在网站底部</p>
+                  </div>
+                  <Button onClick={handleSaveContact} disabled={saving}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {saving ? '保存中...' : '保存更改'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">公司电话</Label>
+                  <Input
+                    id="phone"
+                    value={contactData.phone}
+                    onChange={(e) => setContactData({ ...contactData, phone: e.target.value })}
+                    placeholder="400-xxx-xxxx"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="email">公司邮箱</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={contactData.email}
+                    onChange={(e) => setContactData({ ...contactData, email: e.target.value })}
+                    placeholder="contact@example.com"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="address">公司地址</Label>
+                  <Textarea
+                    id="address"
+                    value={contactData.address}
+                    onChange={(e) => setContactData({ ...contactData, address: e.target.value })}
+                    placeholder="xx省xx市xx区xx路xx号"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="wechat">客服微信</Label>
+                  <Input
+                    id="wechat"
+                    value={contactData.wechat}
+                    onChange={(e) => setContactData({ ...contactData, wechat: e.target.value })}
+                    placeholder="微信号或微信二维码链接"
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Features Tab */}
           <TabsContent value="features" className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h2 className="text-lg font-semibold mb-4">功能特性管理</h2>
-              <p className="text-gray-500 mb-6">
-                当前共有 {features.length} 个功能特性展示在首页
-              </p>
-              <div className="space-y-4">
-                {features.map((feature, index) => (
-                  <div key={feature.id} className="border rounded-lg p-4">
-                    <div className="flex items-center gap-4">
-                      <span className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold">
-                        {index + 1}
-                      </span>
-                      <div className="flex-1">
-                        <h4 className="font-medium">{feature.title}</h4>
-                        <p className="text-sm text-gray-500">{feature.description}</p>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>功能特性管理</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">管理首页展示的功能特性列表</p>
+                  </div>
+                  <Button onClick={() => openFeatureDialog()}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    添加功能
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {features.map((feature, index) => (
+                    <div key={feature.id} className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
+                        <span className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold text-sm">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{feature.title}</h4>
+                        <p className="text-sm text-gray-500 truncate">{feature.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => openFeatureDialog(feature)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setDeleteDialog({ open: true, type: 'feature', id: feature.id })}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm text-gray-400 mt-4">
-                * 功能特性的完整编辑功能需要在数据库中操作
-              </p>
-            </div>
+                  ))}
+                  {features.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <Settings className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>暂无功能特性，点击上方按钮添加</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Hardware Tab */}
           <TabsContent value="hardware" className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h2 className="text-lg font-semibold mb-4">硬件规格管理</h2>
-              <p className="text-gray-500 mb-6">
-                当前共有 {hardwareSpecs.length} 个硬件规格展示
-              </p>
-              <div className="space-y-4">
-                {hardwareSpecs.map((spec, index) => (
-                  <div key={spec.id} className="border rounded-lg p-4">
-                    <div className="flex items-center gap-4">
-                      <span className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-600 font-bold">
-                        {index + 1}
-                      </span>
-                      <div className="flex-1">
-                        <h4 className="font-medium">{spec.name}</h4>
-                        <p className="text-sm text-gray-500">{spec.value}</p>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>硬件规格管理</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">管理产品硬件规格参数</p>
+                  </div>
+                  <Button onClick={() => openHardwareDialog()}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    添加规格
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {hardwareSpecs.map((spec, index) => (
+                    <div key={spec.id} className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
+                        <span className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-600 font-bold text-sm">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{spec.name}</h4>
+                        <p className="text-sm text-gray-500 truncate">
+                          {spec.value} {(spec as any).unit || ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => openHardwareDialog(spec)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setDeleteDialog({ open: true, type: 'hardware', id: spec.id })}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm text-gray-400 mt-4">
-                * 硬件规格的完整编辑功能需要在数据库中操作
-              </p>
-            </div>
+                  ))}
+                  {hardwareSpecs.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <Cpu className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>暂无硬件规格，点击上方按钮添加</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* FAQ Tab */}
           <TabsContent value="faq" className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h2 className="text-lg font-semibold mb-4">FAQ管理</h2>
-              <p className="text-gray-500 mb-6">
-                当前共有 {faqs.length} 个FAQ展示
-              </p>
-              <div className="space-y-4">
-                {faqs.map((faq) => (
-                  <div key={faq.id} className="border rounded-lg p-4">
-                    <div className="flex items-start gap-4">
-                      <span className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600 font-bold flex-shrink-0">
-                        Q
-                      </span>
-                      <div className="flex-1">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>FAQ管理</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">管理常见问题解答</p>
+                  </div>
+                  <Button onClick={() => openFaqDialog()}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    添加FAQ
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {faqs.map((faq, index) => (
+                    <div key={faq.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-2 pt-1">
+                        <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
+                        <span className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600 font-bold text-sm">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <h4 className="font-medium">{faq.question}</h4>
-                        <p className="text-sm text-gray-500 mt-1">{faq.answer}</p>
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{faq.answer}</p>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button variant="ghost" size="sm" onClick={() => openFaqDialog(faq)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setDeleteDialog({ open: true, type: 'faq', id: faq.id })}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm text-gray-400 mt-4">
-                * FAQ的完整编辑功能需要在数据库中操作
-              </p>
-            </div>
+                  ))}
+                  {faqs.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <HelpCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>暂无FAQ，点击上方按钮添加</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Feature Dialog */}
+      <Dialog open={featureDialog.open} onOpenChange={(open) => setFeatureDialog({ ...featureDialog, open })}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{featureDialog.editing ? '编辑功能' : '添加功能'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="feature-title">标题</Label>
+              <Input
+                id="feature-title"
+                value={featureForm.title}
+                onChange={(e) => setFeatureForm({ ...featureForm, title: e.target.value })}
+                placeholder="功能名称"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="feature-desc">描述</Label>
+              <Textarea
+                id="feature-desc"
+                value={featureForm.description}
+                onChange={(e) => setFeatureForm({ ...featureForm, description: e.target.value })}
+                placeholder="功能描述"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="feature-icon">图标</Label>
+              <Input
+                id="feature-icon"
+                value={featureForm.icon}
+                onChange={(e) => setFeatureForm({ ...featureForm, icon: e.target.value })}
+                placeholder="图标名称（如：BarChart3）"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="feature-order">排序</Label>
+              <Input
+                id="feature-order"
+                type="number"
+                value={featureForm.order}
+                onChange={(e) => setFeatureForm({ ...featureForm, order: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFeatureDialog({ open: false })}>
+              取消
+            </Button>
+            <Button onClick={handleSaveFeature} disabled={saving}>
+              {saving ? '保存中...' : '保存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hardware Dialog */}
+      <Dialog open={hardwareDialog.open} onOpenChange={(open) => setHardwareDialog({ ...hardwareDialog, open })}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{hardwareDialog.editing ? '编辑硬件规格' : '添加硬件规格'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="hardware-name">名称</Label>
+              <Input
+                id="hardware-name"
+                value={hardwareForm.name}
+                onChange={(e) => setHardwareForm({ ...hardwareForm, name: e.target.value })}
+                placeholder="如：处理器、内存"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="hardware-value">数值</Label>
+                <Input
+                  id="hardware-value"
+                  value={hardwareForm.value}
+                  onChange={(e) => setHardwareForm({ ...hardwareForm, value: e.target.value })}
+                  placeholder="如：8"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hardware-unit">单位</Label>
+                <Input
+                  id="hardware-unit"
+                  value={hardwareForm.unit}
+                  onChange={(e) => setHardwareForm({ ...hardwareForm, unit: e.target.value })}
+                  placeholder="如：GB、GHz"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hardware-order">排序</Label>
+              <Input
+                id="hardware-order"
+                type="number"
+                value={hardwareForm.order}
+                onChange={(e) => setHardwareForm({ ...hardwareForm, order: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHardwareDialog({ open: false })}>
+              取消
+            </Button>
+            <Button onClick={handleSaveHardware} disabled={saving}>
+              {saving ? '保存中...' : '保存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* FAQ Dialog */}
+      <Dialog open={faqDialog.open} onOpenChange={(open) => setFaqDialog({ ...faqDialog, open })}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{faqDialog.editing ? '编辑FAQ' : '添加FAQ'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="faq-question">问题</Label>
+              <Input
+                id="faq-question"
+                value={faqForm.question}
+                onChange={(e) => setFaqForm({ ...faqForm, question: e.target.value })}
+                placeholder="输入问题"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="faq-answer">答案</Label>
+              <Textarea
+                id="faq-answer"
+                value={faqForm.answer}
+                onChange={(e) => setFaqForm({ ...faqForm, answer: e.target.value })}
+                placeholder="输入答案"
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="faq-order">排序</Label>
+              <Input
+                id="faq-order"
+                type="number"
+                value={faqForm.order}
+                onChange={(e) => setFaqForm({ ...faqForm, order: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFaqDialog({ open: false })}>
+              取消
+            </Button>
+            <Button onClick={handleSaveFaq} disabled={saving}>
+              {saving ? '保存中...' : '保存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialog?.open || false} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>确认删除</DialogTitle>
+          </DialogHeader>
+          <p className="py-4 text-gray-600">
+            确定要删除这个{deleteDialog?.type === 'feature' ? '功能' : deleteDialog?.type === 'hardware' ? '硬件规格' : 'FAQ'}吗？此操作无法撤销。
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog(null)}>
+              取消
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                if (deleteDialog?.type === 'feature') handleDeleteFeature();
+                else if (deleteDialog?.type === 'hardware') handleDeleteHardware();
+                else if (deleteDialog?.type === 'faq') handleDeleteFaq();
+              }}
+              disabled={saving}
+            >
+              {saving ? '删除中...' : '删除'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
