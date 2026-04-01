@@ -1,4 +1,20 @@
-import { TrendingUp, Mail, Phone, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Mail, Phone, MapPin, TrendingUp } from 'lucide-react';
+import { siteContentApi } from '@/supabase/client';
+
+interface ContactInfo {
+  phone: string;
+  email: string;
+  address: string;
+  wechat: string;
+}
+
+const defaultContact: ContactInfo = {
+  phone: '400-xxx-xxxx',
+  email: 'support@stockai.com',
+  address: '请配置公司地址',
+  wechat: '',
+};
 
 const footerLinks = {
   product: [
@@ -27,6 +43,30 @@ const footerLinks = {
 };
 
 export default function Footer() {
+  const [contact, setContact] = useState<ContactInfo>(defaultContact);
+
+  useEffect(() => {
+    loadContactInfo();
+  }, []);
+
+  const loadContactInfo = async () => {
+    try {
+      const contactData = await siteContentApi.getContentBySection('contact');
+      const contactMap: Record<string, string> = {};
+      contactData.forEach((item) => {
+        contactMap[item.key] = item.value;
+      });
+      setContact({
+        phone: contactMap.phone || defaultContact.phone,
+        email: contactMap.email || defaultContact.email,
+        address: contactMap.address || defaultContact.address,
+        wechat: contactMap.wechat || defaultContact.wechat,
+      });
+    } catch (error) {
+      console.error('Failed to load contact info:', error);
+    }
+  };
+
   const scrollToSection = (href: string) => {
     if (href.startsWith('#')) {
       const element = document.querySelector(href);
@@ -38,10 +78,9 @@ export default function Footer() {
 
   return (
     <footer className="bg-gray-900 text-gray-300">
-      {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
-          {/* Brand */}
+          {/* Brand Column */}
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
@@ -58,20 +97,20 @@ export default function Footer() {
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <Mail className="w-4 h-4 text-blue-400" />
-                <span>support@stockai.com</span>
+                <span>{contact.email}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Phone className="w-4 h-4 text-blue-400" />
-                <span>400-888-8888</span>
+                <span>{contact.phone}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <MapPin className="w-4 h-4 text-blue-400" />
-                <span>北京市朝阳区</span>
+                <span>{contact.address}</span>
               </div>
             </div>
           </div>
 
-          {/* Links */}
+          {/* Product Links */}
           <div>
             <h4 className="font-semibold text-white mb-4">产品</h4>
             <ul className="space-y-3">
@@ -88,6 +127,7 @@ export default function Footer() {
             </ul>
           </div>
 
+          {/* Support Links */}
           <div>
             <h4 className="font-semibold text-white mb-4">支持</h4>
             <ul className="space-y-3">
@@ -104,6 +144,7 @@ export default function Footer() {
             </ul>
           </div>
 
+          {/* Company Links */}
           <div>
             <h4 className="font-semibold text-white mb-4">公司</h4>
             <ul className="space-y-3">
@@ -120,6 +161,7 @@ export default function Footer() {
             </ul>
           </div>
 
+          {/* Legal Links */}
           <div>
             <h4 className="font-semibold text-white mb-4">法律</h4>
             <ul className="space-y-3">

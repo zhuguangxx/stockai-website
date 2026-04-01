@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, HelpCircle } from 'lucide-react';
-import { faqApi } from '@/supabase/client';
+import { faqApi, siteContentApi } from '@/supabase/client';
 import type { FAQItem } from '@/types';
 
 const defaultFAQs: FAQItem[] = [
@@ -45,10 +45,12 @@ const defaultFAQs: FAQItem[] = [
 export default function FAQ() {
   const [faqs, setFaqs] = useState<FAQItem[]>(defaultFAQs);
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const [contactEmail, setContactEmail] = useState<string>('support@stockai.com');
   const [, setLoading] = useState(true);
 
   useEffect(() => {
     loadFAQs();
+    loadContactEmail();
   }, []);
 
   const loadFAQs = async () => {
@@ -61,6 +63,17 @@ export default function FAQ() {
       console.error('Failed to load FAQs:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadContactEmail = async () => {
+    try {
+      const emailData = await siteContentApi.getContent('contact', 'email');
+      if (emailData?.value) {
+        setContactEmail(emailData.value);
+      }
+    } catch (error) {
+      console.error('Failed to load contact email:', error);
     }
   };
 
@@ -127,7 +140,7 @@ export default function FAQ() {
             还有其他问题？
           </p>
           <a
-            href="mailto:support@stockai.com"
+            href={`mailto:${contactEmail}`}
             className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
           >
             联系我们的客服团队
