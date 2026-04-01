@@ -2,9 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import type { SiteContent, Feature, HardwareSpec, FAQItem } from '@/types';
 
 // 这些环境变量需要在Vercel中配置
-// 注意：VITE_ 开头的变量需要在构建时注入
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://psjifolrwvdhsvcafuyq.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzamlmb2xyd3ZkaHN2Y2FmdXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM0OTYwMDAsImV4cCI6MjA1OTA3MjAwMH0.tCpR86WdRh5ESNZ8pg4XOQ_mOYz5vPW7Z5HjRj6tX4Y';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // 检查是否配置了Supabase
 const isConfigured = supabaseUrl && supabaseAnonKey;
