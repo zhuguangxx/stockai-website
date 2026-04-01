@@ -32,6 +32,7 @@ export interface HardwareSpec {
   id: string;
   name: string;
   value: string;
+  unit?: string;
   order: number;
 }
 

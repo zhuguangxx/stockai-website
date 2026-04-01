@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS hardware_specs (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   name VARCHAR(200) NOT NULL,    -- 规格名称
   value VARCHAR(500) NOT NULL,   -- 规格值
+  unit VARCHAR(50),              -- 单位（可选）
   "order" INTEGER DEFAULT 0,     -- 排序
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
