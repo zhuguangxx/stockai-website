@@ -175,7 +175,7 @@ export default function Hardware() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-blue-200 text-sm">智投云专用主机</p>
-                  <p className="text-3xl font-bold">¥1,299</p>
+                  <p className="text-3xl font-bold">?299</p>
                 </div>
                 <div className="text-right">
                   <p className="text-blue-200 text-sm">使用方式</p>

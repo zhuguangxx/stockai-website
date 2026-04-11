@@ -54,7 +54,7 @@ export default function AdminPanel() {
     subTitle: '6大技术指标专家 + AI智能分析 + 家庭共享 / 一台设备，全家受益',
     ctaPrimary: '立即了解',
     ctaSecondary: '查看功能演示',
-    price: '¥1,299',
+    price: '?299',
   });
 
   // Contact content
@@ -488,7 +488,7 @@ export default function AdminPanel() {
                     id="price"
                     value={heroData.price}
                     onChange={(e) => setHeroData({ ...heroData, price: e.target.value })}
-                    placeholder="¥1,299"
+                    placeholder="?299"
                   />
                 </div>
               </CardContent>

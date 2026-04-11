@@ -16,7 +16,7 @@ const defaultData: HeroData = {
   subTitle: '6大技术指标专家 + AI智能分析 + 家庭共享 / 一台设备，全家受益',
   ctaPrimary: '立即了解',
   ctaSecondary: '查看功能演示',
-  price: '¥1,299',
+  price: '?299',
 };
 
 export default function Hero() {
