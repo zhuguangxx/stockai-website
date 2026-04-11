@@ -109,7 +109,7 @@ INSERT INTO site_content (section, key, value, type) VALUES
   ('hero', 'subTitle', '6大技术指标专家 + AI智能分析 + 家庭共享 / 一台设备，全家受益', 'text'),
   ('hero', 'ctaPrimary', '立即了解', 'text'),
   ('hero', 'ctaSecondary', '查看功能演示', 'text'),
-  ('hero', 'price', '¥1,299', 'text')
+  ('hero', 'price', '?299', 'text')
 ON CONFLICT (section, key) DO NOTHING;
 
 -- 功能特性
